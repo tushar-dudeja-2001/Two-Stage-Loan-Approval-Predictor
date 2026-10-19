@@ -17,8 +17,8 @@ def two_stage_predict(cls, reg, applicant_df):
     reg_pred = None
     if approved == 1:
         
-        applicant_df_reg = applicant_df.copy()
-        applicant_df_reg['loan_status'] = 'Approve'
+        # pass only the columns the regressor was trained on
+        applicant_df_reg = applicant_df[list(reg.feature_names_in_)]
         reg_pred = float(reg.predict(applicant_df_reg)[0])
     
     results.append({
