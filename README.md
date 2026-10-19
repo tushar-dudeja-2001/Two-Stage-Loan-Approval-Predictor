@@ -69,7 +69,8 @@ The models are served through:
    - Categorical: most-frequent imputation → one-hot encoding
 4. **Stage 1 – Classification:** Random Forest tuned with `GridSearchCV` (5-fold CV, F1 scoring), stratified 80/20 split
 5. **Stage 2 – Regression:** Random Forest Regressor tuned with `GridSearchCV` (5-fold CV, R² scoring), trained on approved applicants only
-6. **Deployment** – both pipelines saved with `joblib`, served via Streamlit Community Cloud
+6. **Model comparison** – benchmarked against Logistic/Linear Regression, Decision Tree, XGBoost and LightGBM on the same split ([`model_comparison.ipynb`](notebooks/model_comparison.ipynb))
+7. **Deployment** – both pipelines saved with `joblib`, served via Streamlit Community Cloud
 
 ---
 
@@ -94,6 +95,37 @@ Only **12 of 854** test applications were misclassified (5 false approvals, 7 fa
 | R² | **0.86** |
 | Mean absolute error | ₹25.1 lakh (on an average loan of ₹1.56 crore) |
 | Median percentage error | ~15% |
+
+---
+
+## ⚖️ Model Comparison – Why Random Forest?
+
+Every model was tuned with `GridSearchCV` (5-fold CV) and tested on the **same split** as the final pipeline. Full details in [`notebooks/model_comparison.ipynb`](notebooks/model_comparison.ipynb).
+
+### Stage 1 – Approval
+
+| Model | CV F1 (mean ± std) | Test accuracy | Test F1 | ROC-AUC | Errors (of 854) |
+|---|---|---|---|---|---|
+| **Random Forest (deployed)** | 0.985 ± 0.002 | **98.6%** | **0.989** | **0.999** | **12** |
+| Decision Tree | 0.983 ± 0.005 | 98.5% | 0.988 | 0.991 | 13 |
+| XGBoost | 0.986 ± 0.003 | 98.4% | 0.987 | 0.999 | 14 |
+| LightGBM | 0.988 ± 0.004 | 98.2% | 0.986 | 0.998 | 15 |
+| Logistic Regression | 0.934 ± 0.005 | 91.6% | 0.933 | 0.964 | 72 |
+
+### Stage 2 – Loan amount
+
+| Model | CV R² (mean ± std) | Test R² | Test MAE (₹ lakh) |
+|---|---|---|---|
+| Linear Regression | 0.870 ± 0.010 | 0.869 | 25.2 |
+| XGBoost | 0.873 ± 0.008 | 0.868 | 25.0 |
+| **Random Forest (deployed)** | 0.869 ± 0.010 | 0.865 | 25.1 |
+| LightGBM | 0.869 ± 0.007 | 0.858 | 25.4 |
+
+**What this shows:**
+- **Tree models beat the linear baseline by ~7% in Stage 1.** Approval hinges on a sharp CIBIL threshold (~550) that tree splits capture directly and a linear boundary can't.
+- **All tree models are within the cross-validation noise** of each other (~0.3%), so boosting adds complexity without a measurable gain. Random Forest had the best test score and the most stable CV score — **keeping it is justified by evidence, not by default**.
+- **In Stage 2, Linear Regression matches the tree models.** Loan amount is almost a straight-line function of income (correlation 0.93), so a simpler, more explainable model would work just as well.
+- **Takeaway:** on this data, *features matter far more than model choice*.
 
 ---
 
@@ -138,11 +170,13 @@ The regressor was trained with `loan_status` as an input, but it's always "Appro
 │   ├── stage_1_rf_classifier_pipeline.pkl
 │   └── stage_2_rf_regression_pipeline.pkl
 ├── notebooks/
-│   └── analyze.ipynb      # EDA, training, tuning and evaluation
+│   ├── analyze.ipynb           # EDA, training, tuning and evaluation
+│   └── model_comparison.ipynb  # benchmark against 4 other models
 ├── config.yaml            # model paths + default UI inputs
 ├── main.py                # command-line app
 ├── streamlit_app.py       # web app
-└── requirements.txt
+├── requirements.txt       # app dependencies
+└── requirements-dev.txt   # + XGBoost / LightGBM for the comparison notebook
 ```
 
 ---
@@ -170,6 +204,11 @@ uv run python main.py
 
 **Retrain the models:** run `notebooks/analyze.ipynb` top to bottom — it saves new pipelines to `models/`.
 
+**Run the model comparison:** install the extra libraries first, then run `notebooks/model_comparison.ipynb` (it does not overwrite the saved models).
+```bash
+uv pip install -r requirements-dev.txt
+```
+
 > **Note:** the models were trained with scikit-learn 1.7.1. Use the versions in `requirements.txt` so the saved pipelines load correctly.
 
 ---
@@ -183,7 +222,7 @@ uv run python main.py
 ## 🔮 Future Improvements
 
 - Add **SHAP explanations** so each applicant sees *why* they were approved or rejected
-- Compare against **XGBoost / LightGBM** and logistic regression baselines
+- Try **Linear Regression for Stage 2** in production — the comparison shows it is as accurate as Random Forest and far more explainable
 - Add unit tests and a CI pipeline
 - Expose the model through a **FastAPI** endpoint
 
@@ -191,7 +230,7 @@ uv run python main.py
 
 ## 🧰 Tech Stack
 
-Python · pandas · NumPy · scikit-learn · Matplotlib · Seaborn · Streamlit · joblib · uv
+Python · pandas · NumPy · scikit-learn · XGBoost · LightGBM · Matplotlib · Seaborn · Streamlit · joblib · uv
 
 ## 👤 Author
 
