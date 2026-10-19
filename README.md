@@ -9,8 +9,7 @@
 
 👉 **Try it live:** https://two-stage-loan-approval-predictor.streamlit.app/
 
-<!-- Add a screenshot of the app: save it as docs/app_screenshot.png and uncomment the line below -->
-<!-- ![App screenshot](docs/app_screenshot.png) -->
+![App screenshot](docs/app_screenshot.png)
 
 ---
 
